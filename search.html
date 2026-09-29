@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuel Flow — Find stations</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .search-head{ padding: 40px 0 26px; }
+  .search-head h1{ font-size: clamp(24px, 3vw, 32px); margin-bottom: 8px; }
+  .search-head p{ color: var(--muted); font-size: 15px; }
+
+  .search-controls{
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+    padding-bottom: 26px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 30px;
+  }
+  .search-box{
+    flex: 1;
+    min-width: 220px;
+    position: relative;
+  }
+  .search-box input{
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-s);
+    font-size: 14px;
+  }
+  .search-box input:focus{ outline: 2px solid var(--amber); outline-offset: 1px; }
+
+  .chip-filter{
+    display: flex; align-items: center; gap: 7px;
+    font-size: 13px; font-weight: 500;
+    padding: 10px 15px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: #fff;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .chip-filter .dot{ width: 8px; height: 8px; border-radius: 50%; background: var(--dot-color, var(--muted)); }
+  .chip-filter.active{ background: var(--ink); color: #fff; border-color: var(--ink); }
+  .chip-filter.active .dot{ background: #fff; }
+
+  select#sortSelect{
+    padding: 10px 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-s);
+    font-size: 13px;
+    color: var(--ink);
+    background: #fff;
+  }
+
+  .results-meta{ font-size: 13.5px; color: var(--muted); margin-bottom: 18px; }
+
+  .results-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding-bottom: 90px;
+  }
+
+  .result-card{
+    border: 1px solid var(--line);
+    border-radius: var(--radius-m);
+    padding: 22px;
+    transition: opacity 0.2s ease;
+  }
+  .result-card.hidden{ display: none; }
+
+  .result-top{ display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 16px; }
+  .result-top h3{ font-size: 17px; margin-bottom: 3px; }
+  .result-top .loc{ font-size: 13px; color: var(--muted); }
+
+  .result-fuels{ display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+  .result-actions{ display: flex; gap: 10px; }
+
+  .empty-state{
+    text-align: center;
+    padding: 70px 20px;
+    color: var(--muted);
+    display: none;
+  }
+  .empty-state.show{ display: block; }
+  .empty-state h3{ color: var(--ink); margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="nav-wrap" id="navWrap">
+    <a href="index.html" class="brand-mark">FUEL<span class="accent">FLOW</span></a>
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="search.html" class="current">Find stations</a>
+      <a href="map.html">Map</a>
+      <a href="prebook.html">Pre-book</a>
+    </nav>
+    <div class="nav-actions">
+      <a href="login.html" class="btn btn-ghost btn-sm">Log in</a>
+      <a href="prebook.html" class="btn btn-amber btn-sm">Pre-book fuel</a>
+    </div>
+    <button class="nav-toggle" id="navToggle">☰</button>
+  </div>
+</header>
+
+<div class="container search-head">
+  <h1>Find a station</h1>
+  <p>Search by station name or area, then filter by the fuel you need to see exactly how much is in stock.</p>
+</div>
+
+<div class="container">
+  <div class="search-controls">
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Search by station name or address…">
+    </div>
+    <div class="chip-filter active" data-fuel="all"><span class="dot"></span>All fuels</div>
+    <div class="chip-filter" data-fuel="petrol" style="--dot-color:#3e86c7"><span class="dot"></span>Petrol</div>
+    <div class="chip-filter" data-fuel="diesel" style="--dot-color:#4fa672"><span class="dot"></span>Diesel</div>
+    <div class="chip-filter" data-fuel="premium" style="--dot-color:#c6484a"><span class="dot"></span>Premium</div>
+    <div class="chip-filter" data-fuel="cng" style="--dot-color:#35ada6"><span class="dot"></span>CNG</div>
+    <select id="sortSelect">
+      <option value="name">Sort: Station name</option>
+      <option value="stock">Sort: Highest stock first</option>
+      <option value="low">Sort: Lowest stock first</option>
+    </select>
+  </div>
+
+  <div class="results-meta" id="resultsMeta"></div>
+  <div class="results-grid" id="resultsGrid"></div>
+  <div class="empty-state" id="emptyState">
+    <h3>No stations match your search</h3>
+    <p>Try a different name, or clear the fuel filter to see everything nearby.</p>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div>
+      <div class="brand-mark small" style="color:#fff">FUEL<span class="accent">FLOW</span></div>
+      <p>Real-time fuel visibility and reservations, station by station.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <a href="search.html">Find stations</a>
+      <a href="map.html">Map view</a>
+      <a href="prebook.html">Pre-booking</a>
+    </div>
+    <div>
+      <h4>Account</h4>
+      <a href="login.html">Log in</a>
+      <a href="login.html#signup">Create account</a>
+    </div>
+    <div>
+      <h4>Fuel legend</h4>
+      <span><i style="background:#3e86c7"></i>Petrol</span>
+      <span><i style="background:#4fa672"></i>Diesel</span>
+      <span><i style="background:#c6484a"></i>Premium</span>
+      <span><i style="background:#35ada6"></i>CNG</span>
+    </div>
+  </div>
+  <div class="footer-bottom">Fuel Flow — station inventory & booking network. Data shown is illustrative.</div>
+</footer>
+
+<script src="data.js"></script>
+<script>
+  document.getElementById('navToggle').addEventListener('click', () => {
+    document.getElementById('navWrap').classList.toggle('open');
+  });
+
+  const grid = document.getElementById('resultsGrid');
+  const meta = document.getElementById('resultsMeta');
+  const emptyState = document.getElementById('emptyState');
+  let activeFuel = 'all';
+  let sortMode = 'name';
+  let query = '';
+
+  function stationMaxPct(s){
+    return Math.max(...s.tanks.map(t => (t.qty / t.cap) * 100));
+  }
+  function stationMinPct(s){
+    return Math.min(...s.tanks.map(t => (t.qty / t.cap) * 100));
+  }
+
+  function renderResults(){
+    let list = STATIONS.filter(s => {
+      const matchesQuery = (s.name + ' ' + s.address).toLowerCase().includes(query.toLowerCase());
+      const matchesFuel = activeFuel === 'all' || s.tanks.some(t => t.fuel === activeFuel);
+      return matchesQuery && matchesFuel;
+    });
+
+    if(sortMode === 'name') list.sort((a,b) => a.name.localeCompare(b.name));
+    if(sortMode === 'stock') list.sort((a,b) => stationMaxPct(b) - stationMaxPct(a));
+    if(sortMode === 'low') list.sort((a,b) => stationMinPct(a) - stationMinPct(b));
+
+    grid.innerHTML = '';
+    meta.textContent = `${list.length} station${list.length === 1 ? '' : 's'} found`;
+    emptyState.classList.toggle('show', list.length === 0);
+
+    list.forEach(s => {
+      const status = stationStatus(s);
+      const tanksToShow = activeFuel === 'all' ? s.tanks : s.tanks.filter(t => t.fuel === activeFuel);
+      const fuelRows = tanksToShow.map(t => {
+        const meta = FUEL_META[t.fuel];
+        const pct = Math.round((t.qty / t.cap) * 100);
+        return `
+          <div class="fuel-chip">
+            <span class="swatch" style="background:${meta.color}"></span>
+            <span class="fname">${meta.label}</span>
+            <span class="fqty">${t.qty.toLocaleString()} ${meta.unit} · ${pct}%</span>
+          </div>
+        `;
+      }).join('');
+
+      const card = document.createElement('div');
+      card.className = 'result-card';
+      card.innerHTML = `
+        <div class="result-top">
+          <div>
+            <h3>${s.name}</h3>
+            <div class="loc">${s.address}</div>
+          </div>
+          <span class="status-pill ${status}"><span class="dot"></span>${status === 'ok' ? 'Operational' : 'Low stock'}</span>
+        </div>
+        <div class="result-fuels">${fuelRows}</div>
+        <div class="result-actions">
+          <a href="map.html" class="btn btn-ghost btn-sm">View on map</a>
+          <a href="prebook.html?station=${s.id}" class="btn btn-amber btn-sm">Pre-book</a>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    query = e.target.value;
+    renderResults();
+  });
+
+  document.querySelectorAll('.chip-filter').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip-filter').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      activeFuel = chip.dataset.fuel;
+      renderResults();
+    });
+  });
+
+  document.getElementById('sortSelect').addEventListener('change', (e) => {
+    sortMode = e.target.value;
+    renderResults();
+  });
+
+  renderResults();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuel Flow — Station map</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  .map-page-head{ padding: 40px 0 26px; }
+  .map-page-head h1{ font-size: clamp(24px, 3vw, 32px); margin-bottom: 8px; }
+  .map-page-head p{ color: var(--muted); font-size: 15px; }
+
+  .map-layout{
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .map-sidebar{
+    border-right: 1px solid var(--line);
+    max-height: 620px;
+    overflow-y: auto;
+  }
+
+  .sidebar-item{
+    padding: 20px 22px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .sidebar-item:hover{ background: var(--paper-alt); }
+  .sidebar-item.active{ background: var(--paper-alt); border-left: 3px solid var(--amber); }
+
+  .sidebar-item .top-row{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 10px; }
+  .sidebar-item h3{ font-size: 15.5px; margin-bottom: 3px; }
+  .sidebar-item .loc{ font-size: 12.5px; color: var(--muted); }
+  .sidebar-item .desc{ font-size: 13px; color: var(--muted); margin-bottom: 12px; line-height: 1.4; }
+
+  #map{ height: 620px; width: 100%; }
+
+  .leaflet-popup-content h4{ font-size: 14px; margin-bottom: 4px; }
+  .leaflet-popup-content .loc{ font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+
+  @media (max-width: 900px){
+    .map-layout{ grid-template-columns: 1fr; }
+    .map-sidebar{ max-height: 320px; border-right: none; border-bottom: 1px solid var(--line); }
+    #map{ height: 420px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="nav-wrap" id="navWrap">
+    <a href="index.html" class="brand-mark">FUEL<span class="accent">FLOW</span></a>
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="search.html">Find stations</a>
+      <a href="map.html" class="current">Map</a>
+      <a href="prebook.html">Pre-book</a>
+    </nav>
+    <div class="nav-actions">
+      <a href="login.html" class="btn btn-ghost btn-sm">Log in</a>
+      <a href="prebook.html" class="btn btn-amber btn-sm">Pre-book fuel</a>
+    </div>
+    <button class="nav-toggle" id="navToggle">☰</button>
+  </div>
+</header>
+
+<div class="container map-page-head">
+  <h1>Find stations on the map</h1>
+  <p>Pins mark Agrabad, Bandar, and Patenga in Chattogram. Select a location in the list to pan the map or open it on Google Maps.</p>
+</div>
+
+<div class="map-layout">
+  <div class="map-sidebar" id="sidebar"></div>
+  <div id="map"></div>
+</div>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div>
+      <div class="brand-mark small" style="color:#fff">FUEL<span class="accent">FLOW</span></div>
+      <p>Real-time fuel visibility and reservations, station by station.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <a href="search.html">Find stations</a>
+      <a href="map.html">Map view</a>
+      <a href="prebook.html">Pre-booking</a>
+    </div>
+    <div>
+      <h4>Account</h4>
+      <a href="login.html">Log in</a>
+      <a href="login.html#signup">Create account</a>
+    </div>
+    <div>
+      <h4>Fuel legend</h4>
+      <span><i style="background:#3e86c7"></i>Petrol</span>
+      <span><i style="background:#4fa672"></i>Diesel</span>
+      <span><i style="background:#c6484a"></i>Premium</span>
+      <span><i style="background:#35ada6"></i>CNG</span>
+    </div>
+  </div>
+  <div class="footer-bottom">Fuel Flow — station inventory & booking network. Data shown is illustrative.</div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  document.getElementById('navToggle').addEventListener('click', () => {
+    document.getElementById('navWrap').classList.toggle('open');
+  });
+
+  // ---- Replaced data: Chattogram locations instead of fuel stations ----
+  const PLACES = [
+    {
+      id: "agrabad",
+      name: "Agrabad Commercial Area",
+      address: "Agrabad Commercial Area, Chattogram, Bangladesh",
+      desc: "Chattogram's main commercial and business district.",
+      lat: 22.3244537,
+      lng: 91.8117232,
+      mapsUrl: "https://maps.google.com/?cid=9117312545341699057"
+    },
+    {
+      id: "bandar",
+      name: "Bandar",
+      address: "Bandar, Chattogram, Bangladesh",
+      desc: "Area near the Chattogram port, close to the Karnaphuli river.",
+      lat: 22.3104165,
+      lng: 91.801367,
+      mapsUrl: "https://maps.google.com/?cid=5647517514713795631"
+    },
+    {
+      id: "patenga",
+      name: "Patenga Sea Beach",
+      address: "Sea Beach Rd, Chattogram, Bangladesh",
+      desc: "Popular sea beach on the Bay of Bengal, near the airport.",
+      lat: 22.2350808,
+      lng: 91.7915721,
+      mapsUrl: "https://maps.google.com/?cid=16090129736435118550"
+    }
+  ];
+
+  const center = [22.28, 91.80];
+  const map = L.map('map', { scrollWheelZoom: false }).setView(center, 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 18
+  }).addTo(map);
+
+  function pinIcon(color){
+    return L.divIcon({
+      className: '',
+      html: `<div style="width:18px;height:18px;border-radius:50% 50% 50% 0;background:${color};transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 18],
+      popupAnchor: [0, -18]
+    });
+  }
+
+  const markers = {};
+  const sidebarEl = document.getElementById('sidebar');
+
+  PLACES.forEach(p => {
+    const marker = L.marker([p.lat, p.lng], { icon: pinIcon('#3e86c7') }).addTo(map);
+    marker.bindPopup(`
+      <h4>${p.name}</h4>
+      <div class="loc">${p.address}</div>
+      <div>${p.desc}</div>
+      <a href="${p.mapsUrl}" target="_blank" class="btn btn-amber btn-sm" style="margin-top:8px;display:inline-block">Open in Google Maps</a>
+    `);
+    markers[p.id] = marker;
+
+    const item = document.createElement('div');
+    item.className = 'sidebar-item';
+    item.dataset.id = p.id;
+    item.innerHTML = `
+      <div class="top-row">
+        <div>
+          <h3>${p.name}</h3>
+          <div class="loc">${p.address}</div>
+        </div>
+      </div>
+      <div class="desc">${p.desc}</div>
+      <a href="${p.mapsUrl}" target="_blank" class="btn btn-ghost btn-sm btn-block">Open in Google Maps</a>
+    `;
+    item.addEventListener('click', (e) => {
+      if(e.target.closest('a')) return;
+      document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      map.flyTo([p.lat, p.lng], 14, { duration: 0.6 });
+      marker.openPopup();
+    });
+    sidebarEl.appendChild(item);
+  });
+</script>
+
+</body>
+</html>

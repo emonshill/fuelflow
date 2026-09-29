@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuel Flow — Pre-book fuel</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .prebook-head{ padding: 40px 0 10px; }
+  .prebook-head h1{ font-size: clamp(24px, 3vw, 32px); margin-bottom: 8px; }
+  .prebook-head p{ color: var(--muted); font-size: 15px; max-width: 560px; }
+
+  .prebook-layout{
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 40px;
+    padding: 30px 0 90px;
+    align-items: start;
+  }
+
+  .panel{
+    border: 1px solid var(--line);
+    border-radius: var(--radius-m);
+    padding: 28px;
+  }
+
+  .stock-note{
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--paper-alt);
+    border-radius: var(--radius-s);
+    padding: 12px 14px;
+    font-size: 13px;
+    margin-top: -6px;
+    margin-bottom: 18px;
+  }
+  .stock-note .fqty{ font-family: 'Space Grotesk', monospace; font-weight: 600; }
+
+  .summary-panel{ position: sticky; top: 90px; }
+  .summary-row{ display: flex; justify-content: space-between; font-size: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .summary-row:last-of-type{ border-bottom: none; }
+  .summary-row .label{ color: var(--muted); }
+  .summary-total{ display: flex; justify-content: space-between; font-size: 17px; font-weight: 700; padding-top: 16px; margin-top: 6px; border-top: 1px solid var(--line-strong); }
+
+  .ticket{
+    display: none;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-m);
+    padding: 24px;
+    margin-top: 20px;
+    background: var(--paper-alt);
+  }
+  .ticket.show{ display: block; }
+  .ticket h3{ font-size: 16px; margin-bottom: 4px; }
+  .ticket .ref{ font-family: 'Space Grotesk', monospace; font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+  .ticket-row{ display: flex; justify-content: space-between; font-size: 13.5px; padding: 6px 0; }
+  .ticket-row .label{ color: var(--muted); }
+
+  @media (max-width: 900px){
+    .prebook-layout{ grid-template-columns: 1fr; }
+    .summary-panel{ position: static; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="nav-wrap" id="navWrap">
+    <a href="index.html" class="brand-mark">FUEL<span class="accent">FLOW</span></a>
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="search.html">Find stations</a>
+      <a href="map.html">Map</a>
+      <a href="prebook.html" class="current">Pre-book</a>
+    </nav>
+    <div class="nav-actions">
+      <a href="login.html" class="btn btn-ghost btn-sm">Log in</a>
+      <a href="prebook.html" class="btn btn-amber btn-sm">Pre-book fuel</a>
+    </div>
+    <button class="nav-toggle" id="navToggle">☰</button>
+  </div>
+</header>
+
+<div class="container prebook-head">
+  <h1>Pre-book your fuel</h1>
+  <p>Choose a station and fuel type, set the quantity and pickup window, and we'll hold it for you.</p>
+</div>
+
+<div class="container prebook-layout">
+  <div class="panel">
+    <form id="prebookForm" novalidate>
+      <div class="field">
+        <label for="stationSelect">Station</label>
+        <select id="stationSelect" required></select>
+      </div>
+
+      <div class="field">
+        <label for="fuelSelect">Fuel type</label>
+        <select id="fuelSelect" required></select>
+      </div>
+
+      <div class="stock-note" id="stockNote"></div>
+
+      <div class="field" id="qtyField">
+        <label for="qtyInput">Quantity</label>
+        <input type="number" id="qtyInput" min="1" placeholder="e.g. 20" required>
+        <span class="error-text" id="qtyError">Enter a quantity within the available stock.</span>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="dateInput">Pickup date</label>
+          <input type="date" id="dateInput" required>
+        </div>
+        <div class="field">
+          <label for="timeInput">Pickup time</label>
+          <input type="time" id="timeInput" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="nameInput">Full name</label>
+        <input type="text" id="nameInput" placeholder="Jordan Lee" required>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="phoneInput">Phone number</label>
+          <input type="tel" id="phoneInput" placeholder="(555) 000-0000" required>
+        </div>
+        <div class="field">
+          <label for="vehicleInput">Vehicle number (optional)</label>
+          <input type="text" id="vehicleInput" placeholder="e.g. KA-05-AB-1234">
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-amber btn-block">Confirm pre-booking</button>
+    </form>
+  </div>
+
+  <div>
+    <div class="panel summary-panel">
+      <h3 style="margin-bottom:16px;">Booking summary</h3>
+      <div class="summary-row"><span class="label">Station</span><span id="sumStation">—</span></div>
+      <div class="summary-row"><span class="label">Fuel type</span><span id="sumFuel">—</span></div>
+      <div class="summary-row"><span class="label">Quantity</span><span id="sumQty">—</span></div>
+      <div class="summary-row"><span class="label">Price per unit</span><span id="sumPrice">—</span></div>
+      <div class="summary-total"><span>Estimated total</span><span id="sumTotal">$0.00</span></div>
+
+      <div class="ticket" id="ticket">
+        <h3>Booking confirmed</h3>
+        <div class="ref" id="ticketRef"></div>
+        <div class="ticket-row"><span class="label">Station</span><span id="ticketStation"></span></div>
+        <div class="ticket-row"><span class="label">Fuel</span><span id="ticketFuel"></span></div>
+        <div class="ticket-row"><span class="label">Pickup</span><span id="ticketPickup"></span></div>
+        <div class="ticket-row"><span class="label">Name</span><span id="ticketName"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div>
+      <div class="brand-mark small" style="color:#fff">FUEL<span class="accent">FLOW</span></div>
+      <p>Real-time fuel visibility and reservations, station by station.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <a href="search.html">Find stations</a>
+      <a href="map.html">Map view</a>
+      <a href="prebook.html">Pre-booking</a>
+    </div>
+    <div>
+      <h4>Account</h4>
+      <a href="login.html">Log in</a>
+      <a href="login.html#signup">Create account</a>
+    </div>
+    <div>
+      <h4>Fuel legend</h4>
+      <span><i style="background:#3e86c7"></i>Petrol</span>
+      <span><i style="background:#4fa672"></i>Diesel</span>
+      <span><i style="background:#c6484a"></i>Premium</span>
+      <span><i style="background:#35ada6"></i>CNG</span>
+    </div>
+  </div>
+  <div class="footer-bottom">Fuel Flow — station inventory & booking network. Data shown is illustrative.</div>
+</footer>
+
+<script src="data.js"></script>
+<script>
+  document.getElementById('navToggle').addEventListener('click', () => {
+    document.getElementById('navWrap').classList.toggle('open');
+  });
+
+  const stationSelect = document.getElementById('stationSelect');
+  const fuelSelect = document.getElementById('fuelSelect');
+  const qtyInput = document.getElementById('qtyInput');
+  const stockNote = document.getElementById('stockNote');
+
+  STATIONS.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = `${s.name} — ${s.address}`;
+    stationSelect.appendChild(opt);
+  });
+
+  // Preselect station from ?station= query param
+  const params = new URLSearchParams(window.location.search);
+  const preselect = params.get('station');
+  if(preselect && STATIONS.some(s => s.id === preselect)){
+    stationSelect.value = preselect;
+  }
+
+  function currentStation(){
+    return STATIONS.find(s => s.id === stationSelect.value);
+  }
+  function currentTank(){
+    const st = currentStation();
+    return st.tanks.find(t => t.fuel === fuelSelect.value);
+  }
+
+  function populateFuels(){
+    const st = currentStation();
+    fuelSelect.innerHTML = '';
+    st.tanks.forEach(t => {
+      const meta = FUEL_META[t.fuel];
+      const opt = document.createElement('option');
+      opt.value = t.fuel;
+      opt.textContent = meta.label;
+      fuelSelect.appendChild(opt);
+    });
+    updateStockNote();
+  }
+
+  function updateStockNote(){
+    const t = currentTank();
+    const meta = FUEL_META[t.fuel];
+    stockNote.innerHTML = `<span>Available at this station</span><span class="fqty">${t.qty.toLocaleString()} ${meta.unit}</span>`;
+    qtyInput.max = t.qty;
+    qtyInput.placeholder = `Up to ${t.qty.toLocaleString()} ${meta.unit}`;
+    updateSummary();
+  }
+
+  function updateSummary(){
+    const st = currentStation();
+    const t = currentTank();
+    const meta = FUEL_META[t.fuel];
+    const qty = parseFloat(qtyInput.value) || 0;
+    document.getElementById('sumStation').textContent = st.name;
+    document.getElementById('sumFuel').textContent = meta.label;
+    document.getElementById('sumQty').textContent = qty ? `${qty} ${meta.unit}` : '—';
+    document.getElementById('sumPrice').textContent = `$${t.price.toFixed(2)} / ${meta.unit}`;
+    document.getElementById('sumTotal').textContent = `$${(qty * t.price).toFixed(2)}`;
+  }
+
+  stationSelect.addEventListener('change', populateFuels);
+  fuelSelect.addEventListener('change', updateStockNote);
+  qtyInput.addEventListener('input', updateSummary);
+
+  populateFuels();
+
+  document.getElementById('prebookForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const t = currentTank();
+    const qtyField = document.getElementById('qtyField');
+    const qty = parseFloat(qtyInput.value);
+    const qtyOk = qty > 0 && qty <= t.qty;
+    qtyField.classList.toggle('invalid', !qtyOk);
+    if(!qtyOk) return;
+
+    const st = currentStation();
+    const meta = FUEL_META[t.fuel];
+    const date = document.getElementById('dateInput').value;
+    const time = document.getElementById('timeInput').value;
+    const name = document.getElementById('nameInput').value || 'Guest';
+
+    const ref = 'FF-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    document.getElementById('ticketRef').textContent = `Reference ${ref}`;
+    document.getElementById('ticketStation').textContent = st.name;
+    document.getElementById('ticketFuel').textContent = `${meta.label} · ${qty} ${meta.unit}`;
+    document.getElementById('ticketPickup').textContent = (date || 'Date TBC') + ' at ' + (time || 'time TBC');
+    document.getElementById('ticketName').textContent = name;
+    document.getElementById('ticket').classList.add('show');
+    document.getElementById('ticket').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+</script>
+
+</body>
+</html>
